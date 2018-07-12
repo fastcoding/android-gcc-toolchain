@@ -208,6 +208,8 @@ case ${ARCH:=arm} in
     *) _msg "invalid arch '$ARCH'. Must be arm(default)|arm64|x86|x86_64|mips|mips64 or aliases i386|ia32|x64|mipsel|mipsel64"; exit 1 ;;
 esac
 
+ARCH_NAME=$(echo $ARCH_PREFIX | sed s/-\$// )
+
 ################################################################################
 #check Android API level
 minAPIL=""
@@ -380,7 +382,12 @@ if [[ ! -f "$BIN"/.final-wrapper-created ]]; then
 
     #copy *-gcc as *-cc
     ln -f "$BIN_ARCH_PREFIX"gcc$_EXE "$BIN_ARCH_PREFIX"cc$_EXE || exit
+		
+		#link all lib under $TC_TOP/$ARCH_PREFIX/lib
 
+		ln -fs $TC_TOP/$ARCH_NAME/lib/*/*.{a,so} $TC_TOP/lib/gcc/$ARCH_NAME/*/ 2>/dev/null
+		ln -fs $TC_TOP/$ARCH_NAME/lib/*/thumb/*.{a,so} $TC_TOP/lib/gcc/$ARCH_NAME/*/thumb/ 2>/dev/null
+		ln -fs $TC_TOP/$ARCH_NAME/lib/?/thumb/hard/*.{a,so} $TC_TOP/lib/gcc/$ARCH_NAME/*/thumb/hard/ 2>/dev/null
     #create gcc wrapper
     s=gcc
     sed "s/\$ARCH_PREFIX/$ARCH_PREFIX/g" "$thisDir"/android/compiler-wrapper > "$BIN"/$s.tmp || exit
@@ -474,6 +481,10 @@ if [[ $ARCH == mips && $STL == gnustl && ! -f $BIN/../.bits_h_merged ]]; then
     && touch "$BIN"/../.bits_h_merged
 fi
 
+if [[ $ARCH == arm && $STL == gnustl && ! -f $BIN/../.bits_h_merged ]]; then
+    ln -f "$BIN"/../include/c++/?.?.?/*/*/bits/*.h "$BIN"/../include/c++/?.?.?/bits/ \
+    && touch "$BIN"/../.bits_h_merged
+fi
 #add std::snprintf to <cstdio> so make it compatible with libc++
 if [[ $STL == gnustl && ! -f $BIN/../.std_snprintf_added_to_cstdio ]]; then
     "$BIN_ARCH_PREFIX"g++$_EXE -E -x c++ - <<< "#include <cstdio>" | grep -q 'using ::snprintf'
@@ -608,6 +619,7 @@ case $ENV_MODE in
     ;;
 ################################################################################
 -c) #$CC mode
+		echo cc mode
     export CC=$q$BIN/gcc$q
     export CXX=$q$BIN/g++$q
     export LINK=$q$BIN/g++$q
